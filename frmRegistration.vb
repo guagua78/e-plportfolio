@@ -13,6 +13,8 @@ Public Class frmRegister
     Private Sub RegisterForm_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         pnlContainer.Left = (Me.ClientSize.Width - pnlContainer.Width) \ 2
         pnlContainer.Top = (Me.ClientSize.Height - pnlContainer.Height) \ 2
+        pnlStrengthBar.Visible = False
+        lblPassHint.Visible = False
 
         cmbProgram.Items.Clear()
         cmbProgram.Items.Add("BS Computer Science")
@@ -30,13 +32,14 @@ Public Class frmRegister
         cmbYearLevel.Items.Add("4th Year")
         cmbYearLevel.SelectedIndex = 0
 
+        txtPassword.MaxLength = 20
+        txtConfirmPassword.MaxLength = 20
 
         SendMessage(txtFirstName.Handle, EM_SETCUEBANNER, 0, " e.g., Rene")
         SendMessage(txtLastName.Handle, EM_SETCUEBANNER, 0, " e.g., Baterbonia")
         SendMessage(txtEmail.Handle, EM_SETCUEBANNER, 0, " e.g., student@plpasig.edu.ph")
         SendMessage(txtConfirmPassword.Handle, EM_SETCUEBANNER, 0, " Re-enter your password")
     End Sub
-
 
     Private Sub btnRegister_Click(sender As Object, e As EventArgs) Handles btnRegister.Click
         ' 1. Extract values
@@ -51,11 +54,11 @@ Public Class frmRegister
 
         ' 2. Field Validation
         If String.IsNullOrWhiteSpace(studentNum) OrElse
-       String.IsNullOrWhiteSpace(firstName) OrElse
-       String.IsNullOrWhiteSpace(lastName) OrElse
-       String.IsNullOrWhiteSpace(email) OrElse
-       String.IsNullOrWhiteSpace(password) OrElse
-       String.IsNullOrWhiteSpace(confirmPassword) Then
+           String.IsNullOrWhiteSpace(firstName) OrElse
+           String.IsNullOrWhiteSpace(lastName) OrElse
+           String.IsNullOrWhiteSpace(email) OrElse
+           String.IsNullOrWhiteSpace(password) OrElse
+           String.IsNullOrWhiteSpace(confirmPassword) Then
 
             MessageBox.Show("Please fill in all required fields.", "Registration Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -86,7 +89,7 @@ Public Class frmRegister
             Using conn As MySqlConnection = GetConnection()
                 If conn IsNot Nothing Then
                     Dim query As String = "INSERT INTO students (student_number, first_name, last_name, email, password_hash, degree_program, year_level) " &
-                                      "VALUES (@student_num, @first_name, @last_name, @email, @password_hash, @degree_program, @year_level)"
+                                          "VALUES (@student_num, @first_name, @last_name, @email, @password_hash, @degree_program, @year_level)"
 
                     Using cmd As New MySqlCommand(query, conn)
                         cmd.Parameters.AddWithValue("@student_num", studentNum)
@@ -125,28 +128,80 @@ Public Class frmRegister
         txtPassword.Clear()
         txtConfirmPassword.Clear()
 
-        chckShowPass.Checked = False
-        chckShowConfirmPass.Checked = False
+        txtPassword.UseSystemPasswordChar = True
+        txtConfirmPassword.UseSystemPasswordChar = True
 
         If cmbProgram.Items.Count > 0 Then cmbProgram.SelectedIndex = 0
         If cmbYearLevel.Items.Count > 0 Then cmbYearLevel.SelectedIndex = 0
     End Sub
 
-    Private Sub chckShowPass_CheckedChanged(sender As Object, e As EventArgs) Handles chckShowPass.CheckedChanged
-        txtPassword.UseSystemPasswordChar = Not chckShowPass.Checked
-    End Sub
+    Private Sub txtPassword_TextChanged(sender As Object, e As EventArgs) Handles txtPassword.TextChanged
+        If txtPassword Is Nothing OrElse pnlStrengthBar Is Nothing OrElse lblPassHint Is Nothing Then Return
 
-    Private Sub chckShowConfirmPass_CheckedChanged(sender As Object, e As EventArgs) Handles chckShowConfirmPass.CheckedChanged
-        txtConfirmPassword.UseSystemPasswordChar = Not chckShowConfirmPass.Checked
-    End Sub
+        Dim pwd As String = txtPassword.Text
 
-    Private Sub frmRegister_Resize(sender As Object, e As EventArgs) Handles MyBase.Resize
-        If pnlContainer IsNot Nothing Then
-            pnlContainer.Left = (Me.ClientSize.Width - pnlContainer.Width) \ 2
-            pnlContainer.Top = (Me.ClientSize.Height - pnlContainer.Height) \ 2
+        If String.IsNullOrWhiteSpace(pwd) Then
+            pnlStrengthBar.Visible = False
+            lblPassHint.Visible = False
+            Return
+        End If
+
+        ' Force visibility and strict geometry
+        pnlStrengthBar.Visible = True
+        lblPassHint.Visible = True
+
+        ' Lock bar height to a thin 4px line directly under txtPassword
+        pnlStrengthBar.Height = 4
+        pnlStrengthBar.Left = txtPassword.Left
+        pnlStrengthBar.Top = txtPassword.Bottom + 4
+
+        ' Position hint label directly below the 4px bar
+        lblPassHint.Left = txtPassword.Left
+        lblPassHint.Top = pnlStrengthBar.Bottom + 2
+
+        pnlStrengthBar.BringToFront()
+        lblPassHint.BringToFront()
+
+        ' Update strength colors & indicator text
+        If pwd.Length < 6 Then
+            pnlStrengthBar.BackColor = Color.Crimson
+            pnlStrengthBar.Width = CInt(txtPassword.Width * 0.33)
+            lblPassHint.Text = "Too short (min 6 characters)"
+            lblPassHint.ForeColor = Color.Crimson
+        ElseIf pwd.Length >= 6 AndAlso pwd.Length <= 10 Then
+            pnlStrengthBar.BackColor = Color.Orange
+            pnlStrengthBar.Width = CInt(txtPassword.Width * 0.66)
+            lblPassHint.Text = "Medium strength"
+            lblPassHint.ForeColor = Color.DarkOrange
+        Else
+            pnlStrengthBar.BackColor = Color.ForestGreen
+            pnlStrengthBar.Width = txtPassword.Width
+            lblPassHint.Text = "Strong password"
+            lblPassHint.ForeColor = Color.ForestGreen
         End If
     End Sub
 
+    Private Sub chkShowPassword_CheckedChanged(sender As Object, e As EventArgs) Handles chckShowPass.CheckedChanged
+        If chckShowPass.Checked Then
+            txtPassword.UseSystemPasswordChar = False
+            txtPassword.PasswordChar = ControlChars.NullChar
+        Else
+            txtPassword.UseSystemPasswordChar = True
+        End If
+    End Sub
 
+    Private Sub chkShowConfirmPassword_CheckedChanged(sender As Object, e As EventArgs) Handles chckShowConfirmPass.CheckedChanged
+        If chckShowConfirmPass.Checked Then
+            txtConfirmPassword.UseSystemPasswordChar = False
+            txtConfirmPassword.PasswordChar = ControlChars.NullChar
+        Else
+            txtConfirmPassword.UseSystemPasswordChar = True
+        End If
+    End Sub
 
+    Private Sub btnLogin_Click(sender As Object, e As EventArgs) Handles btnLogin.Click
+        Dim loginForm As New studlogin()
+        loginForm.Show()
+        Me.Hide()
+    End Sub
 End Class
